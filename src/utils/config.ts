@@ -2,45 +2,45 @@ export interface Config {
   // Required credentials
   githubToken: string;
   githubUsername: string;
-  geminiApiKey: string;
+  llmApiKey: string;
+  llmBaseUrl: string;
 
   // Category settings
-  maxCategories: number; // Maximum number of categories (default: 32, GitHub limit)
-  maxCategoriesPerRepo: number; // Maximum categories per repository (default: 3)
-  minCategoriesPerRepo: number; // Minimum categories per repository (default: 1)
+  maxCategories: number;
+  maxCategoriesPerRepo: number;
+  minCategoriesPerRepo: number;
 
   // Batch processing settings
-  classifyBatchSize: number; // Gemini classification batch size (default: 20)
-  readmeBatchSize: number; // README fetch concurrent requests (default: 20)
-  listCreateDelay: number; // Delay between List creation in ms (default: 500)
-  batchDelay: number; // Delay between batches in ms (default: 2000)
+  classifyBatchSize: number;
+  readmeBatchSize: number;
+  listCreateDelay: number;
+  batchDelay: number;
 
   // Rate limiting
-  geminiRpm: number; // Gemini API requests per minute limit (default: 15)
-  githubRequestDelay: number; // Delay between GitHub API requests in ms (default: 100)
+  githubRequestDelay: number;
 
-  // Gemini model settings
-  geminiModel: string; // Gemini model (default: gemini-2.0-flash)
-  geminiTemperaturePlanning: number; // Category planning temperature (default: 0.7)
-  geminiTemperatureClassify: number; // Classification temperature (default: 0.3)
-  geminiMaxTokensPlanning: number; // Category planning max tokens (default: 65536)
-  geminiMaxTokensClassify: number; // Classification max tokens (default: 65536)
+  // LLM model settings
+  llmModel: string;
+  llmTemperaturePlanning: number;
+  llmTemperatureClassify: number;
+  llmMaxTokensPlanning: number;
+  llmMaxTokensClassify: number;
 
   // README settings
-  readmeMaxLength: number; // Maximum README length (default: 500, for batch)
-  readmeMaxLengthSingle: number; // Maximum README length for single classification (default: 2000)
+  readmeMaxLength: number;
+  readmeMaxLengthSingle: number;
 
   // List settings
-  listIsPrivate: boolean; // Whether created Lists are private (default: false)
-  listNameMaxLength: number; // Maximum List name length (default: 20)
+  listIsPrivate: boolean;
+  listNameMaxLength: number;
 
   // Retry settings
-  maxRetries: number; // Maximum retry count (default: 3)
-  retryDelay: number; // Delay between retries in ms (default: 1000)
+  maxRetries: number;
+  retryDelay: number;
 
   // Debug settings
-  debug: boolean; // Debug mode (default: false)
-  logApiResponses: boolean; // Log API responses (default: false)
+  debug: boolean;
+  logApiResponses: boolean;
 }
 
 function parseIntEnv(key: string, defaultValue: number): number {
@@ -66,7 +66,7 @@ function parseBoolEnv(key: string, defaultValue: boolean): boolean {
 export function loadConfig(): Config {
   const githubToken = process.env.GITHUB_TOKEN;
   const githubUsername = process.env.GITHUB_USERNAME;
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const llmApiKey = process.env.LLM_API_KEY;
 
   if (!githubToken) {
     throw new Error(
@@ -80,9 +80,9 @@ export function loadConfig(): Config {
     );
   }
 
-  if (!geminiApiKey) {
+  if (!llmApiKey) {
     throw new Error(
-      "GEMINI_API_KEY environment variable is required. Please check your .env file.",
+      "LLM_API_KEY environment variable is required. Please check your .env file.",
     );
   }
 
@@ -90,7 +90,8 @@ export function loadConfig(): Config {
     // Required credentials
     githubToken,
     githubUsername,
-    geminiApiKey,
+    llmApiKey,
+    llmBaseUrl: process.env.LLM_BASE_URL || "https://api.openai.com/v1",
 
     // Category settings
     maxCategories: parseIntEnv("MAX_CATEGORIES", 32),
@@ -104,15 +105,14 @@ export function loadConfig(): Config {
     batchDelay: parseIntEnv("BATCH_DELAY", 2000),
 
     // Rate limiting
-    geminiRpm: parseIntEnv("GEMINI_RPM", 15),
     githubRequestDelay: parseIntEnv("GITHUB_REQUEST_DELAY", 100),
 
-    // Gemini model settings
-    geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    geminiTemperaturePlanning: parseFloatEnv("GEMINI_TEMPERATURE_PLANNING", 0.7),
-    geminiTemperatureClassify: parseFloatEnv("GEMINI_TEMPERATURE_CLASSIFY", 0.3),
-    geminiMaxTokensPlanning: parseIntEnv("GEMINI_MAX_TOKENS_PLANNING", 65536),
-    geminiMaxTokensClassify: parseIntEnv("GEMINI_MAX_TOKENS_CLASSIFY", 65536),
+    // LLM model settings
+    llmModel: process.env.LLM_MODEL || "gpt-4o-mini",
+    llmTemperaturePlanning: parseFloatEnv("LLM_TEMPERATURE_PLANNING", 0.7),
+    llmTemperatureClassify: parseFloatEnv("LLM_TEMPERATURE_CLASSIFY", 0.3),
+    llmMaxTokensPlanning: parseIntEnv("LLM_MAX_TOKENS_PLANNING", 8192),
+    llmMaxTokensClassify: parseIntEnv("LLM_MAX_TOKENS_CLASSIFY", 8192),
 
     // README settings
     readmeMaxLength: parseIntEnv("README_MAX_LENGTH", 10000),

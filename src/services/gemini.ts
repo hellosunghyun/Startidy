@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import OpenAI from "openai";
 import type {
   Category,
   ClassificationResult,
@@ -19,65 +19,43 @@ export interface BatchClassificationResult {
 }
 
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private client: OpenAI;
   private config: Config;
 
   constructor(config: Config) {
     this.config = config;
-    this.ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+    this.client = new OpenAI({
+      apiKey: config.llmApiKey,
+      baseURL: config.llmBaseUrl,
+    });
   }
 
-  /**
-   * Plans categories based on the starred repositories
-   */
   async planCategories(repos: RepoSummary[]): Promise<Category[]> {
     const prompt = buildCategoryPlannerPrompt(repos, this.config);
 
-    // Structured Output Schema for category planning
-    const categorySchema = {
-      type: Type.OBJECT,
-      properties: {
-        categories: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: {
-                type: Type.STRING,
-                description: "Category name (max 20 chars, format: Major: Minor)",
-              },
-              description: {
-                type: Type.STRING,
-                description: "Category description",
-              },
-            },
-            required: ["name", "description"],
-            propertyOrdering: ["name", "description"],
-          },
+    const response = await this.client.chat.completions.create({
+      model: this.config.llmModel,
+      max_tokens: this.config.llmMaxTokensPlanning,
+      temperature: this.config.llmTemperaturePlanning,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are a GitHub repository categorization expert. Always respond with valid JSON only, no markdown fences, no explanation. Format: {"categories":[{"name":"...","description":"..."}]}',
         },
-      },
-      required: ["categories"],
-    };
-
-    const response = await this.ai.models.generateContent({
-      model: this.config.geminiModel,
-      contents: prompt,
-      config: {
-        temperature: this.config.geminiTemperaturePlanning,
-        maxOutputTokens: this.config.geminiMaxTokensPlanning,
-        responseMimeType: "application/json",
-        responseSchema: categorySchema,
-      },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = response.text || "";
+    const text = response.choices[0].message.content || "";
 
     if (this.config.logApiResponses) {
-      console.log("\n[DEBUG] Gemini Planning Response:", text);
+      console.log("\n[DEBUG] LLM Planning Response:", text);
     }
 
     try {
-      const parsed = JSON.parse(text);
+      const jsonStr = text.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+      const parsed = JSON.parse(jsonStr);
       const categories = parsed.categories.map((c: { name: string; description: string }) => ({
         name: c.name || "Unnamed",
         description: c.description || "",
@@ -96,108 +74,63 @@ export class GeminiService {
       if (this.config.debug) {
         console.error("Raw response:", text);
       }
-      throw new Error("Failed to parse Gemini category response");
+      throw new Error("Failed to parse LLM category response");
     }
   }
 
-  /**
-   * Classifies multiple repositories at once (batch)
-   * Returns a map of repo id -> categories
-   */
   async classifyRepositoriesBatch(
     repos: BatchRepoInfo[],
     categories: Category[],
   ): Promise<Map<string, string[]>> {
     const prompt = buildBatchClassifierPrompt(repos, categories, this.config);
 
-    // Structured Output Schema for batch classification
-    const classifySchema = {
-      type: Type.OBJECT,
-      properties: {
-        results: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: {
-                type: Type.STRING,
-                description: "Repository ID (owner/name format)",
-              },
-              categories: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.STRING,
-                },
-                description: "Selected category names",
-              },
-            },
-            required: ["id", "categories"],
-            propertyOrdering: ["id", "categories"],
-          },
+    const response = await this.client.chat.completions.create({
+      model: this.config.llmModel,
+      max_tokens: this.config.llmMaxTokensClassify,
+      temperature: this.config.llmTemperatureClassify,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are a GitHub repository classifier. Always respond with valid JSON only, no markdown fences, no explanation. Format: {"results":[{"id":"owner/repo","categories":["Cat: Name"]}]}',
         },
-      },
-      required: ["results"],
-    };
-
-    const response = await this.ai.models.generateContent({
-      model: this.config.geminiModel,
-      contents: prompt,
-      config: {
-        temperature: this.config.geminiTemperatureClassify,
-        maxOutputTokens: this.config.geminiMaxTokensClassify,
-        responseMimeType: "application/json",
-        responseSchema: classifySchema,
-      },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = response.text || "";
+    const text = response.choices[0].message.content || "";
 
     if (this.config.logApiResponses) {
-      console.log("\n[DEBUG] Gemini Classify Response:", text);
+      console.log("\n[DEBUG] LLM Classify Response:", text);
     }
 
     return this.parseBatchClassifierResponse(text, repos, categories);
   }
 
-  /**
-   * Classifies a single repository into one or more categories (fallback)
-   */
   async classifyRepository(
     repo: RepoDetail,
     categories: Category[],
   ): Promise<ClassificationResult> {
     const prompt = buildClassifierPrompt(repo, categories, this.config);
 
-    // Structured Output Schema for single classification
-    const singleClassifySchema = {
-      type: Type.OBJECT,
-      properties: {
-        categories: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING,
-          },
-          description: "Selected category names",
+    const response = await this.client.chat.completions.create({
+      model: this.config.llmModel,
+      max_tokens: 512,
+      temperature: this.config.llmTemperatureClassify,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are a GitHub repository classifier. Always respond with valid JSON only, no markdown fences. Format: {"categories":["Cat: Name"]}',
         },
-      },
-      required: ["categories"],
-    };
-
-    const response = await this.ai.models.generateContent({
-      model: this.config.geminiModel,
-      contents: prompt,
-      config: {
-        temperature: this.config.geminiTemperatureClassify,
-        maxOutputTokens: 512,
-        responseMimeType: "application/json",
-        responseSchema: singleClassifySchema,
-      },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = response.text || "";
+    const text = response.choices[0].message.content || "";
 
     if (this.config.logApiResponses) {
-      console.log("\n[DEBUG] Gemini Single Classify Response:", text);
+      console.log("\n[DEBUG] LLM Single Classify Response:", text);
     }
 
     return this.parseClassifierResponse(text, categories);
@@ -213,7 +146,7 @@ export class GeminiService {
     const defaultCategory = categories[0]?.name || "Lang: ETC";
 
     try {
-      let jsonStr = text.trim();
+      let jsonStr = text.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
 
       // Attempt to recover truncated JSON
       if (!jsonStr.endsWith("}")) {
@@ -222,7 +155,6 @@ export class GeminiService {
         const openBrackets = (jsonStr.match(/\[/g) || []).length;
         const closeBrackets = (jsonStr.match(/\]/g) || []).length;
 
-        // Remove incomplete part after the last complete object
         const lastCompleteIdx = jsonStr.lastIndexOf("}");
         if (lastCompleteIdx > 0) {
           const afterLast = jsonStr.slice(lastCompleteIdx + 1);
@@ -231,7 +163,6 @@ export class GeminiService {
           }
         }
 
-        // Add missing brackets
         jsonStr += "]".repeat(Math.max(0, openBrackets - closeBrackets));
         jsonStr += "}".repeat(Math.max(0, openBraces - closeBraces));
       }
@@ -255,7 +186,6 @@ export class GeminiService {
         );
       }
 
-      // Repos not in response get default
       for (const repo of repos) {
         if (!resultMap.has(repo.id)) {
           resultMap.set(repo.id, [defaultCategory]);
@@ -267,7 +197,6 @@ export class GeminiService {
         console.error("Raw response:", text);
       }
 
-      // Fallback: try to extract individual patterns
       const linePattern = /"id"\s*:\s*"([^"]+)"[^}]*"categories"\s*:\s*\[([^\]]*)\]/g;
       let match;
       while ((match = linePattern.exec(text)) !== null) {
@@ -284,7 +213,6 @@ export class GeminiService {
         }
       }
 
-      // Remaining repos get default
       for (const repo of repos) {
         if (!resultMap.has(repo.id)) {
           resultMap.set(repo.id, [defaultCategory]);
@@ -300,8 +228,8 @@ export class GeminiService {
     categories: Category[],
   ): ClassificationResult {
     try {
-      // Structured Output - parse JSON directly
-      const parsed = JSON.parse(text.trim());
+      const jsonStr = text.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+      const parsed = JSON.parse(jsonStr);
 
       if (!parsed.categories || !Array.isArray(parsed.categories)) {
         throw new Error("Invalid response structure");
@@ -316,10 +244,7 @@ export class GeminiService {
         validatedCategories.push(categories[0].name);
       }
 
-      return {
-        categories: validatedCategories,
-        reason: "",
-      };
+      return { categories: validatedCategories, reason: "" };
     } catch (error) {
       console.error("Failed to parse classifier response:", error);
       if (this.config.debug) {

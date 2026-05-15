@@ -2,45 +2,45 @@ export interface Config {
   // Required credentials
   githubToken: string;
   githubUsername: string;
-  anthropicAuthToken: string;
-  anthropicBaseUrl: string;
+  llmApiKey: string;
+  llmBaseUrl: string;
 
   // Category settings
-  maxCategories: number; // Maximum number of categories (default: 32, GitHub limit)
-  maxCategoriesPerRepo: number; // Maximum categories per repository (default: 3)
-  minCategoriesPerRepo: number; // Minimum categories per repository (default: 1)
+  maxCategories: number;
+  maxCategoriesPerRepo: number;
+  minCategoriesPerRepo: number;
 
   // Batch processing settings
-  classifyBatchSize: number; // Classification batch size (default: 20)
-  readmeBatchSize: number; // README fetch concurrent requests (default: 20)
-  listCreateDelay: number; // Delay between List creation in ms (default: 500)
-  batchDelay: number; // Delay between batches in ms (default: 2000)
+  classifyBatchSize: number;
+  readmeBatchSize: number;
+  listCreateDelay: number;
+  batchDelay: number;
 
   // Rate limiting
-  githubRequestDelay: number; // Delay between GitHub API requests in ms (default: 100)
+  githubRequestDelay: number;
 
-  // Claude model settings
-  claudeModel: string; // Claude model (default: claude-sonnet-4-6)
-  claudeTemperaturePlanning: number; // Category planning temperature (default: 0.7)
-  claudeTemperatureClassify: number; // Classification temperature (default: 0.3)
-  claudeMaxTokensPlanning: number; // Category planning max tokens (default: 8192)
-  claudeMaxTokensClassify: number; // Classification max tokens (default: 8192)
+  // LLM model settings
+  llmModel: string;
+  llmTemperaturePlanning: number;
+  llmTemperatureClassify: number;
+  llmMaxTokensPlanning: number;
+  llmMaxTokensClassify: number;
 
   // README settings
-  readmeMaxLength: number; // Maximum README length (default: 500, for batch)
-  readmeMaxLengthSingle: number; // Maximum README length for single classification (default: 2000)
+  readmeMaxLength: number;
+  readmeMaxLengthSingle: number;
 
   // List settings
-  listIsPrivate: boolean; // Whether created Lists are private (default: false)
-  listNameMaxLength: number; // Maximum List name length (default: 20)
+  listIsPrivate: boolean;
+  listNameMaxLength: number;
 
   // Retry settings
-  maxRetries: number; // Maximum retry count (default: 3)
-  retryDelay: number; // Delay between retries in ms (default: 1000)
+  maxRetries: number;
+  retryDelay: number;
 
   // Debug settings
-  debug: boolean; // Debug mode (default: false)
-  logApiResponses: boolean; // Log API responses (default: false)
+  debug: boolean;
+  logApiResponses: boolean;
 }
 
 function parseIntEnv(key: string, defaultValue: number): number {
@@ -66,7 +66,7 @@ function parseBoolEnv(key: string, defaultValue: boolean): boolean {
 export function loadConfig(): Config {
   const githubToken = process.env.GITHUB_TOKEN;
   const githubUsername = process.env.GITHUB_USERNAME;
-  const anthropicAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const llmApiKey = process.env.LLM_API_KEY;
 
   if (!githubToken) {
     throw new Error(
@@ -80,9 +80,9 @@ export function loadConfig(): Config {
     );
   }
 
-  if (!anthropicAuthToken) {
+  if (!llmApiKey) {
     throw new Error(
-      "ANTHROPIC_AUTH_TOKEN environment variable is required. Please check your .env file.",
+      "LLM_API_KEY environment variable is required. Please check your .env file.",
     );
   }
 
@@ -90,8 +90,8 @@ export function loadConfig(): Config {
     // Required credentials
     githubToken,
     githubUsername,
-    anthropicAuthToken,
-    anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
+    llmApiKey,
+    llmBaseUrl: process.env.LLM_BASE_URL || "https://api.openai.com/v1",
 
     // Category settings
     maxCategories: parseIntEnv("MAX_CATEGORIES", 32),
@@ -107,12 +107,12 @@ export function loadConfig(): Config {
     // Rate limiting
     githubRequestDelay: parseIntEnv("GITHUB_REQUEST_DELAY", 100),
 
-    // Claude model settings
-    claudeModel: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
-    claudeTemperaturePlanning: parseFloatEnv("CLAUDE_TEMPERATURE_PLANNING", 0.7),
-    claudeTemperatureClassify: parseFloatEnv("CLAUDE_TEMPERATURE_CLASSIFY", 0.3),
-    claudeMaxTokensPlanning: parseIntEnv("CLAUDE_MAX_TOKENS_PLANNING", 8192),
-    claudeMaxTokensClassify: parseIntEnv("CLAUDE_MAX_TOKENS_CLASSIFY", 8192),
+    // LLM model settings
+    llmModel: process.env.LLM_MODEL || "gpt-4o-mini",
+    llmTemperaturePlanning: parseFloatEnv("LLM_TEMPERATURE_PLANNING", 0.7),
+    llmTemperatureClassify: parseFloatEnv("LLM_TEMPERATURE_CLASSIFY", 0.3),
+    llmMaxTokensPlanning: parseIntEnv("LLM_MAX_TOKENS_PLANNING", 8192),
+    llmMaxTokensClassify: parseIntEnv("LLM_MAX_TOKENS_CLASSIFY", 8192),
 
     // README settings
     readmeMaxLength: parseIntEnv("README_MAX_LENGTH", 10000),

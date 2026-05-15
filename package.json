@@ -40,8 +40,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
-    "@google/genai": "^0.14.0",
+    "openai": "^4.0.0",
     "@inquirer/prompts": "^7.0.0",
     "commander": "^12.1.0",
     "dotenv": "^17.2.3",

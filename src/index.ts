@@ -22,7 +22,7 @@ program
   .version("1.0.0")
   .option("--token <token>", "GitHub Personal Access Token")
   .option("--username <username>", "GitHub Username")
-  .option("--claude-key <key>", "Anthropic Claude API Key")
+  .option("--api-key <key>", "LLM API Key")
   .option("--max-categories <number>", "Maximum categories (default: 32)")
   .option("--batch-size <number>", "Batch size for classification (default: 20)")
   .option("--private", "Create private Lists")
@@ -33,7 +33,7 @@ program
     // Set environment variables from CLI options
     if (opts.token) process.env.GITHUB_TOKEN = opts.token;
     if (opts.username) process.env.GITHUB_USERNAME = opts.username;
-    if (opts.claudeKey) process.env.ANTHROPIC_AUTH_TOKEN = opts.claudeKey;
+    if (opts.apiKey) process.env.LLM_API_KEY = opts.apiKey;
     if (opts.maxCategories) process.env.MAX_CATEGORIES = opts.maxCategories;
     if (opts.batchSize) process.env.CLASSIFY_BATCH_SIZE = opts.batchSize;
     if (opts.private) process.env.LIST_IS_PRIVATE = "true";

@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import type {
   Category,
   ClassificationResult,
@@ -19,33 +19,38 @@ export interface BatchClassificationResult {
 }
 
 export class GeminiService {
-  private client: Anthropic;
+  private client: OpenAI;
   private config: Config;
 
   constructor(config: Config) {
     this.config = config;
-    this.client = new Anthropic({
-      apiKey: config.anthropicAuthToken,
-      baseURL: config.anthropicBaseUrl,
+    this.client = new OpenAI({
+      apiKey: config.llmApiKey,
+      baseURL: config.llmBaseUrl,
     });
   }
 
   async planCategories(repos: RepoSummary[]): Promise<Category[]> {
     const prompt = buildCategoryPlannerPrompt(repos, this.config);
 
-    const response = await this.client.messages.create({
-      model: this.config.claudeModel,
-      max_tokens: this.config.claudeMaxTokensPlanning,
-      system:
-        'You are a GitHub repository categorization expert. Always respond with valid JSON only, no markdown fences, no explanation. Format: {"categories":[{"name":"...","description":"..."}]}',
-      messages: [{ role: "user", content: prompt }],
-      temperature: this.config.claudeTemperaturePlanning,
+    const response = await this.client.chat.completions.create({
+      model: this.config.llmModel,
+      max_tokens: this.config.llmMaxTokensPlanning,
+      temperature: this.config.llmTemperaturePlanning,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are a GitHub repository categorization expert. Always respond with valid JSON only, no markdown fences, no explanation. Format: {"categories":[{"name":"...","description":"..."}]}',
+        },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = (response.content[0] as { type: "text"; text: string }).text || "";
+    const text = response.choices[0].message.content || "";
 
     if (this.config.logApiResponses) {
-      console.log("\n[DEBUG] Claude Planning Response:", text);
+      console.log("\n[DEBUG] LLM Planning Response:", text);
     }
 
     try {
@@ -69,7 +74,7 @@ export class GeminiService {
       if (this.config.debug) {
         console.error("Raw response:", text);
       }
-      throw new Error("Failed to parse Claude category response");
+      throw new Error("Failed to parse LLM category response");
     }
   }
 
@@ -79,19 +84,24 @@ export class GeminiService {
   ): Promise<Map<string, string[]>> {
     const prompt = buildBatchClassifierPrompt(repos, categories, this.config);
 
-    const response = await this.client.messages.create({
-      model: this.config.claudeModel,
-      max_tokens: this.config.claudeMaxTokensClassify,
-      system:
-        'You are a GitHub repository classifier. Always respond with valid JSON only, no markdown fences, no explanation. Format: {"results":[{"id":"owner/repo","categories":["Cat: Name"]}]}',
-      messages: [{ role: "user", content: prompt }],
-      temperature: this.config.claudeTemperatureClassify,
+    const response = await this.client.chat.completions.create({
+      model: this.config.llmModel,
+      max_tokens: this.config.llmMaxTokensClassify,
+      temperature: this.config.llmTemperatureClassify,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are a GitHub repository classifier. Always respond with valid JSON only, no markdown fences, no explanation. Format: {"results":[{"id":"owner/repo","categories":["Cat: Name"]}]}',
+        },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = (response.content[0] as { type: "text"; text: string }).text || "";
+    const text = response.choices[0].message.content || "";
 
     if (this.config.logApiResponses) {
-      console.log("\n[DEBUG] Claude Classify Response:", text);
+      console.log("\n[DEBUG] LLM Classify Response:", text);
     }
 
     return this.parseBatchClassifierResponse(text, repos, categories);
@@ -103,19 +113,24 @@ export class GeminiService {
   ): Promise<ClassificationResult> {
     const prompt = buildClassifierPrompt(repo, categories, this.config);
 
-    const response = await this.client.messages.create({
-      model: this.config.claudeModel,
+    const response = await this.client.chat.completions.create({
+      model: this.config.llmModel,
       max_tokens: 512,
-      system:
-        'You are a GitHub repository classifier. Always respond with valid JSON only, no markdown fences. Format: {"categories":["Cat: Name"]}',
-      messages: [{ role: "user", content: prompt }],
-      temperature: this.config.claudeTemperatureClassify,
+      temperature: this.config.llmTemperatureClassify,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are a GitHub repository classifier. Always respond with valid JSON only, no markdown fences. Format: {"categories":["Cat: Name"]}',
+        },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = (response.content[0] as { type: "text"; text: string }).text || "";
+    const text = response.choices[0].message.content || "";
 
     if (this.config.logApiResponses) {
-      console.log("\n[DEBUG] Claude Single Classify Response:", text);
+      console.log("\n[DEBUG] LLM Single Classify Response:", text);
     }
 
     return this.parseClassifierResponse(text, categories);

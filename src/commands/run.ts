@@ -27,7 +27,7 @@ export const runCommand = new Command("run")
         console.log("\n[DEBUG] Config:", {
           maxCategories: config.maxCategories,
           classifyBatchSize: config.classifyBatchSize,
-          geminiModel: config.geminiModel,
+          claudeModel: config.claudeModel,
         });
       }
 
@@ -214,7 +214,7 @@ function displayDryRunResults(categories: Category[], config: Config, repoCount:
   console.log(`  - Categories: ${categories.length}`);
   console.log(`  - Target repositories: ${repoCount}`);
   console.log(`  - Batch size: ${config.classifyBatchSize}`);
-  console.log(`  - Gemini model: ${config.geminiModel}`);
+  console.log(`  - Claude model: ${config.claudeModel}`);
   console.log("\n(Dry run mode - no actual execution.)");
 }
 

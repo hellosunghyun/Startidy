@@ -2,7 +2,8 @@ export interface Config {
   // Required credentials
   githubToken: string;
   githubUsername: string;
-  geminiApiKey: string;
+  anthropicAuthToken: string;
+  anthropicBaseUrl: string;
 
   // Category settings
   maxCategories: number; // Maximum number of categories (default: 32, GitHub limit)
@@ -10,21 +11,20 @@ export interface Config {
   minCategoriesPerRepo: number; // Minimum categories per repository (default: 1)
 
   // Batch processing settings
-  classifyBatchSize: number; // Gemini classification batch size (default: 20)
+  classifyBatchSize: number; // Classification batch size (default: 20)
   readmeBatchSize: number; // README fetch concurrent requests (default: 20)
   listCreateDelay: number; // Delay between List creation in ms (default: 500)
   batchDelay: number; // Delay between batches in ms (default: 2000)
 
   // Rate limiting
-  geminiRpm: number; // Gemini API requests per minute limit (default: 15)
   githubRequestDelay: number; // Delay between GitHub API requests in ms (default: 100)
 
-  // Gemini model settings
-  geminiModel: string; // Gemini model (default: gemini-2.0-flash)
-  geminiTemperaturePlanning: number; // Category planning temperature (default: 0.7)
-  geminiTemperatureClassify: number; // Classification temperature (default: 0.3)
-  geminiMaxTokensPlanning: number; // Category planning max tokens (default: 65536)
-  geminiMaxTokensClassify: number; // Classification max tokens (default: 65536)
+  // Claude model settings
+  claudeModel: string; // Claude model (default: claude-sonnet-4-6)
+  claudeTemperaturePlanning: number; // Category planning temperature (default: 0.7)
+  claudeTemperatureClassify: number; // Classification temperature (default: 0.3)
+  claudeMaxTokensPlanning: number; // Category planning max tokens (default: 8192)
+  claudeMaxTokensClassify: number; // Classification max tokens (default: 8192)
 
   // README settings
   readmeMaxLength: number; // Maximum README length (default: 500, for batch)
@@ -66,7 +66,7 @@ function parseBoolEnv(key: string, defaultValue: boolean): boolean {
 export function loadConfig(): Config {
   const githubToken = process.env.GITHUB_TOKEN;
   const githubUsername = process.env.GITHUB_USERNAME;
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const anthropicAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
 
   if (!githubToken) {
     throw new Error(
@@ -80,9 +80,9 @@ export function loadConfig(): Config {
     );
   }
 
-  if (!geminiApiKey) {
+  if (!anthropicAuthToken) {
     throw new Error(
-      "GEMINI_API_KEY environment variable is required. Please check your .env file.",
+      "ANTHROPIC_AUTH_TOKEN environment variable is required. Please check your .env file.",
     );
   }
 
@@ -90,7 +90,8 @@ export function loadConfig(): Config {
     // Required credentials
     githubToken,
     githubUsername,
-    geminiApiKey,
+    anthropicAuthToken,
+    anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
 
     // Category settings
     maxCategories: parseIntEnv("MAX_CATEGORIES", 32),
@@ -104,15 +105,14 @@ export function loadConfig(): Config {
     batchDelay: parseIntEnv("BATCH_DELAY", 2000),
 
     // Rate limiting
-    geminiRpm: parseIntEnv("GEMINI_RPM", 15),
     githubRequestDelay: parseIntEnv("GITHUB_REQUEST_DELAY", 100),
 
-    // Gemini model settings
-    geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    geminiTemperaturePlanning: parseFloatEnv("GEMINI_TEMPERATURE_PLANNING", 0.7),
-    geminiTemperatureClassify: parseFloatEnv("GEMINI_TEMPERATURE_CLASSIFY", 0.3),
-    geminiMaxTokensPlanning: parseIntEnv("GEMINI_MAX_TOKENS_PLANNING", 65536),
-    geminiMaxTokensClassify: parseIntEnv("GEMINI_MAX_TOKENS_CLASSIFY", 65536),
+    // Claude model settings
+    claudeModel: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+    claudeTemperaturePlanning: parseFloatEnv("CLAUDE_TEMPERATURE_PLANNING", 0.7),
+    claudeTemperatureClassify: parseFloatEnv("CLAUDE_TEMPERATURE_CLASSIFY", 0.3),
+    claudeMaxTokensPlanning: parseIntEnv("CLAUDE_MAX_TOKENS_PLANNING", 8192),
+    claudeMaxTokensClassify: parseIntEnv("CLAUDE_MAX_TOKENS_CLASSIFY", 8192),
 
     // README settings
     readmeMaxLength: parseIntEnv("README_MAX_LENGTH", 10000),

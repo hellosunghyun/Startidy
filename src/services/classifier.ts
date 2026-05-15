@@ -127,7 +127,7 @@ async function classifyBatch(
     spinner.succeed("Classification complete");
     return results;
   } catch (error) {
-    spinner.fail("Classification failed");
+    spinner.fail(`Classification failed: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
